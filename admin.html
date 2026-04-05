@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>网站内容管理后台</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="data.js"></script>
+    <style>
+        .json-preview {
+            font-family: monospace;
+            white-space: pre-wrap;
+            background: #f3f4f6;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            font-size: 0.875rem;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 p-8 font-sans">
+    <div class="max-w-4xl mx-auto bg-white p-8 rounded-xl shadow-lg">
+        <h1 class="text-2xl font-bold mb-6 text-gray-800 border-b pb-4 flex justify-between items-center">
+            网站内容管理 (CMS)
+            <span id="status-indicator" class="text-sm font-normal text-gray-500">正在连接服务器...</span>
+        </h1>
+        
+        <p class="mb-6 text-sm text-gray-600 bg-blue-50 p-4 rounded-lg border border-blue-100">
+            <strong>说明：</strong> 修改内容后点击“保存更改”，服务器将自动更新数据。<br>
+            确保 <code>python3 server.py</code> 正在运行。
+        </p>
+
+        <form id="cms-form" class="space-y-8">
+            
+            <!-- Hero Section -->
+            <section class="border p-4 rounded-lg">
+                <h2 class="font-bold text-lg mb-4 text-blue-600">1. 英雄区 (Hero)</h2>
+                <div class="grid grid-cols-1 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">主标题 (支持换行符 \n)</label>
+                        <input type="text" name="hero.title" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border p-2">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">副标题 (渐变文字)</label>
+                        <input type="text" name="hero.subtitle" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border p-2">
+                    </div>
+                </div>
+            </section>
+
+            <!-- Experience Section -->
+            <section class="border p-4 rounded-lg">
+                <h2 class="font-bold text-lg mb-4 text-blue-600">2. 履历 (Experience)</h2>
+                <div id="experience-list" class="space-y-4">
+                    <!-- Dynamic Items -->
+                </div>
+            </section>
+
+            <!-- About Section -->
+            <section class="border p-4 rounded-lg">
+                <h2 class="font-bold text-lg mb-4 text-blue-600">3. 关于我 (About)</h2>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">MBTI 类型</label>
+                        <input type="text" name="about.personality.mbti" class="mt-1 block w-full border p-2 rounded">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">角色标签</label>
+                        <input type="text" name="about.personality.role" class="mt-1 block w-full border p-2 rounded">
+                    </div>
+                    <div class="col-span-2">
+                        <label class="block text-sm font-medium text-gray-700">Slogan</label>
+                        <input type="text" name="about.slogan" class="mt-1 block w-full border p-2 rounded">
+                    </div>
+                </div>
+            </section>
+            
+            <!-- Status Widget -->
+            <section class="border p-4 rounded-lg">
+                <h2 class="font-bold text-lg mb-4 text-blue-600">4. 状态组件 (Status Widget)</h2>
+                 <div class="grid grid-cols-1 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">状态标题</label>
+                        <input type="text" name="widgets.status.title" class="mt-1 block w-full border p-2 rounded">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">高亮关键词 1 (OpenClaw)</label>
+                        <input type="text" name="widgets.status.highlight1" class="mt-1 block w-full border p-2 rounded">
+                    </div>
+                     <div>
+                        <label class="block text-sm font-medium text-gray-700">高亮关键词 2 (个人数字助理)</label>
+                        <input type="text" name="widgets.status.highlight2" class="mt-1 block w-full border p-2 rounded">
+                    </div>
+                </div>
+            </section>
+
+            <div class="pt-6 sticky bottom-4">
+                <button type="button" onclick="saveData()" class="w-full bg-blue-600 text-white py-3 px-4 rounded-md hover:bg-blue-700 transition-colors font-bold shadow-lg flex justify-center items-center">
+                    <span id="btn-text">保存更改</span>
+                    <svg id="btn-loading" class="animate-spin ml-2 h-5 w-5 text-white hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                </button>
+            </div>
+
+        </form>
+    </div>
+
+    <script>
+        let currentData = {};
+
+        // Helper to set value
+        function setValue(name, value) {
+            const input = document.querySelector(`[name="${name}"]`);
+            if (input) input.value = value || '';
+        }
+
+        // Load Data from API
+        async function loadData() {
+            try {
+                const response = await fetch('/api/data');
+                if (!response.ok) throw new Error('Failed to fetch');
+                currentData = await response.json();
+                
+                document.getElementById('status-indicator').innerHTML = '<span class="text-green-500">● 已连接</span>';
+                populateForm(currentData);
+            } catch (error) {
+                console.error('Error loading data:', error);
+                document.getElementById('status-indicator').innerHTML = '<span class="text-red-500">● 连接失败 (请运行 server.py)</span>';
+                
+                // Fallback: try loading from data.js global if server fails (for hybrid mode)
+                if (window.siteData) {
+                    currentData = window.siteData;
+                    populateForm(currentData);
+                    alert("无法连接到后端服务器。已加载本地静态数据（只读模式）。");
+                }
+            }
+        }
+
+        function populateForm(data) {
+            setValue('hero.title', data.hero?.title);
+            setValue('hero.subtitle', data.hero?.subtitle);
+            setValue('about.personality.mbti', data.about?.personality?.mbti);
+            setValue('about.personality.role', data.about?.personality?.role);
+            setValue('about.slogan', data.about?.slogan);
+            setValue('widgets.status.title', data.widgets?.status?.title);
+            setValue('widgets.status.highlight1', data.widgets?.status?.highlight1);
+            setValue('widgets.status.highlight2', data.widgets?.status?.highlight2);
+
+            // Populate Experience List
+            const expContainer = document.getElementById('experience-list');
+            expContainer.innerHTML = '';
+            (data.experience || []).forEach((exp, index) => {
+                const div = document.createElement('div');
+                div.className = "bg-gray-50 p-3 rounded border border-gray-200";
+                div.innerHTML = `
+                    <div class="grid grid-cols-2 gap-2 mb-2">
+                        <input type="text" placeholder="年份" value="${exp.year}" class="exp-year border p-1 rounded text-sm w-full">
+                        <input type="text" placeholder="职位" value="${exp.title}" class="exp-title border p-1 rounded text-sm font-bold w-full">
+                    </div>
+                    <textarea placeholder="描述 (支持 HTML 标签，如 <br> 换行, <b> 加粗)" class="exp-desc w-full border p-1 rounded text-sm h-32 font-mono text-xs leading-relaxed">${exp.description}</textarea>
+                `;
+                expContainer.appendChild(div);
+            });
+        }
+
+        async function saveData() {
+            const btnText = document.getElementById('btn-text');
+            const btnLoading = document.getElementById('btn-loading');
+            
+            btnText.innerText = "保存中...";
+            btnLoading.classList.remove('hidden');
+
+            // Harvest Data
+            const newData = JSON.parse(JSON.stringify(currentData)); // Deep copy
+
+            newData.hero.title = document.querySelector('[name="hero.title"]').value;
+            newData.hero.subtitle = document.querySelector('[name="hero.subtitle"]').value;
+            if(newData.about && newData.about.personality) {
+                newData.about.personality.mbti = document.querySelector('[name="about.personality.mbti"]').value;
+                newData.about.personality.role = document.querySelector('[name="about.personality.role"]').value;
+            }
+            if(newData.about) newData.about.slogan = document.querySelector('[name="about.slogan"]').value;
+            if(newData.widgets && newData.widgets.status) {
+                newData.widgets.status.title = document.querySelector('[name="widgets.status.title"]').value;
+                newData.widgets.status.highlight1 = document.querySelector('[name="widgets.status.highlight1"]').value;
+                newData.widgets.status.highlight2 = document.querySelector('[name="widgets.status.highlight2"]').value;
+            }
+
+            // Harvest Experience
+            const expDivs = document.querySelectorAll('#experience-list > div');
+            newData.experience = Array.from(expDivs).map((div, i) => ({
+                id: i + 1,
+                year: div.querySelector('.exp-year').value,
+                title: div.querySelector('.exp-title').value,
+                company: currentData.experience[i]?.company || "", 
+                description: div.querySelector('.exp-desc').value,
+                tags: currentData.experience[i]?.tags || []
+            }));
+
+            try {
+                const response = await fetch('/api/data', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(newData)
+                });
+
+                if (response.ok) {
+                    currentData = newData;
+                    btnText.innerText = "保存成功！";
+                    setTimeout(() => btnText.innerText = "保存更改", 2000);
+                } else {
+                    throw new Error('Server error');
+                }
+            } catch (error) {
+                console.error('Save failed:', error);
+                alert("保存失败！请检查服务器是否正在运行。");
+                btnText.innerText = "保存失败";
+            } finally {
+                btnLoading.classList.add('hidden');
+            }
+        }
+
+        window.onload = loadData;
+    </script>
+</body>
+</html>
